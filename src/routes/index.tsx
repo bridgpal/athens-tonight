@@ -1,5 +1,7 @@
 import { createFileRoute } from '@tanstack/react-router'
+import { createServerFn } from '@tanstack/react-start'
 import * as React from 'react'
+import { EVENTS_BLOB_KEY, getEventsStore } from '~/lib/events-store'
 
 type EventItem = {
   title: string
@@ -20,13 +22,29 @@ type EventsPayload = {
   }
 }
 
+export const HOMEPAGE_CACHE_TAG = 'homepage'
+
+const getEventsData = createServerFn({ method: 'GET' }).handler(async () => {
+  const store = getEventsStore()
+  const payload = await store.get(EVENTS_BLOB_KEY, { type: 'json' }) as EventsPayload | null
+  return payload
+})
+
 export const Route = createFileRoute('/')({
+  loader: async () => {
+    const data = await getEventsData()
+    return { data }
+  },
+  headers: () => ({
+    'Netlify-CDN-Cache-Control': 'public, s-maxage=43200, stale-while-revalidate=86400',
+    'Netlify-Cache-Tag': HOMEPAGE_CACHE_TAG,
+  }),
   component: RouteComponent,
 })
 
 function RouteComponent() {
-  const [data, setData] = React.useState<EventsPayload | null>(null)
-  const [error, setError] = React.useState<string | null>(null)
+  const { data } = Route.useLoaderData()
+  const error = data === null ? 'Events are warming up. Try again soon.' : null
 
   const updatedAt = React.useMemo(() => {
     if (!data) {
@@ -39,32 +57,6 @@ function RouteComponent() {
     }).format(new Date(data.fetchedAt))
   }, [data])
 
-  React.useEffect(() => {
-    let mounted = true
-
-    const load = async () => {
-      try {
-        const response = await fetch('/api/events')
-        if (!response.ok) {
-          throw new Error('Events are warming up. Try again soon.')
-        }
-        const payload = (await response.json()) as EventsPayload
-        if (mounted) {
-          setData(payload)
-        }
-      } catch (err) {
-        if (mounted) {
-          setError(err instanceof Error ? err.message : 'Unable to load events.')
-        }
-      }
-    }
-
-    load()
-    return () => {
-      mounted = false
-    }
-  }, [])
-
   return (
     <main className="page">
       <section className="hero">
@@ -75,8 +67,8 @@ function RouteComponent() {
 
       <section className="panel">
         {error && <div className="status error">{error}</div>}
-        {!error && !data && (
-          <div className="status">[ LOADING LINEUP... ]</div>
+{!error && !data && (
+          <div className="status">[ NO DATA AVAILABLE ]</div>
         )}
 
         {data && (

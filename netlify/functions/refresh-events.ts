@@ -3,6 +3,7 @@ import { purgeCache } from '@netlify/functions'
 import { buildEventsPayload } from '../../src/lib/events'
 import { EVENTS_BLOB_KEY, getEventsStore } from '../../src/lib/events-store'
 import { EVENTS_CACHE_TAG } from './events'
+import { HOMEPAGE_CACHE_TAG } from '../../src/routes/index'
 
 export default async (req: Request, _context: Context) => {
   if (req.method !== 'POST' && req.method !== 'GET') {
@@ -14,7 +15,7 @@ export default async (req: Request, _context: Context) => {
   await store.setJSON(EVENTS_BLOB_KEY, payload)
 
   // Purge the CDN cache so the new data is served immediately
-  await purgeCache({ tags: [EVENTS_CACHE_TAG] })
+  await purgeCache({ tags: [EVENTS_CACHE_TAG, HOMEPAGE_CACHE_TAG] })
 
   return new Response(
     JSON.stringify({
