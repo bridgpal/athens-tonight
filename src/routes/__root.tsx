@@ -1,13 +1,7 @@
 /// <reference types="vite/client" />
 import * as React from 'react'
 import { TanStackRouterDevtools } from '@tanstack/react-router-devtools'
-import {
-  HeadContent,
-  Link,
-  Outlet,
-  Scripts,
-  createRootRoute,
-} from '@tanstack/react-router'
+import { HeadContent, Outlet, Scripts, createRootRoute } from '@tanstack/react-router'
 import appCss from '~/styles/app.css?url'
 
 export const Route = createRootRoute({
@@ -32,13 +26,10 @@ function RootDocument({ children }: { children: React.ReactNode }) {
         <HeadContent />
       </head>
       <body>
-        <div>
-          <Link to="/">Index</Link>
-          <Link to="/about">About</Link>
-        </div>
-
         {children}
-        <TanStackRouterDevtools position="bottom-right" />
+        {import.meta.env.DEV ? (
+          <TanStackRouterDevtools position="bottom-right" />
+        ) : null}
         <Scripts />
       </body>
     </html>
