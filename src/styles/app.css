@@ -135,10 +135,12 @@ a:active {
 }
 
 .subhead {
-  font-size: 0.9rem;
+  font-size: clamp(0.7rem, 3vw, 0.9rem);
   color: var(--muted);
-  letter-spacing: 0.1em;
+  letter-spacing: 0.05em;
   font-weight: 400;
+  word-break: break-word;
+  overflow-wrap: break-word;
 }
 
 /* PANEL - main content container */
