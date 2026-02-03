@@ -68,15 +68,15 @@ function RouteComponent() {
   return (
     <main className="page">
       <section className="hero">
-        <div className="badge">Athens, GA</div>
-        <h1>Tonight&apos;s Bands</h1>
-        <p className="subhead">Live music in Athens for tonight only.</p>
+        <div className="badge">&gt;&gt; Athens, GA</div>
+        <h1>TONIGHT&apos;S SHOWS</h1>
+        <p className="subhead">// Live music. Local scene. No bullshit.</p>
       </section>
 
       <section className="panel">
         {error && <div className="status error">{error}</div>}
         {!error && !data && (
-          <div className="status">Loading tonight&apos;s lineup…</div>
+          <div className="status">[ LOADING LINEUP... ]</div>
         )}
 
         {data && (
@@ -87,7 +87,7 @@ function RouteComponent() {
             </div>
             {data.events.today.length === 0 ? (
               <div className="status empty">
-                No listings pulled for tonight yet. Check back soon.
+                NO SHOWS LISTED YET. CHECK BACK.
               </div>
             ) : (
               <ul className="event-list">
@@ -110,7 +110,7 @@ function RouteComponent() {
 
       {data && data.events.tomorrow.length > 0 && (
         <details className="tomorrow">
-          <summary>Tomorrow (tap to reveal)</summary>
+          <summary>[+] TOMORROW</summary>
           <ul className="event-list muted">
             {data.events.tomorrow.map((event) => (
               <li key={`${event.title}-${event.time}`} className="event-card">
@@ -128,8 +128,8 @@ function RouteComponent() {
       )}
 
       <footer className="footer">
-        <span>Source: Flagpole live music calendar</span>
-        <span>Auto-refreshes every 12 hours</span>
+        <span>SRC: FLAGPOLE.COM</span>
+        <span>AUTO-REFRESH: 12H</span>
       </footer>
     </main>
   )
