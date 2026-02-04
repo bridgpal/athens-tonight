@@ -1,0 +1,13 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 180 180">
+  <!-- Black background -->
+  <rect width="180" height="180" fill="#000000"/>
+  <!-- Bold "A" for Athens in brutalist monospace style -->
+  <text x="90" y="128"
+        font-family="'JetBrains Mono', 'Courier New', monospace"
+        font-size="130"
+        font-weight="700"
+        fill="#ffffff"
+        text-anchor="middle">A</text>
+  <!-- Sound wave / stage line accent -->
+  <rect x="30" y="145" width="120" height="8" fill="#ffffff"/>
+</svg>
