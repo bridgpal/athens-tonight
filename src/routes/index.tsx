@@ -1,28 +1,9 @@
 import { createFileRoute } from '@tanstack/react-router'
 import { createServerFn } from '@tanstack/react-start'
 import * as React from 'react'
+import type { EventItem, EventsPayload } from '~/lib/events'
 import { EVENTS_BLOB_KEY, getEventsStore } from '~/lib/events-store'
-
-type EventItem = {
-  title: string
-  url: string
-  time: string
-  venue: string
-  date: string
-}
-
-type EventsPayload = {
-  fetchedAt: string
-  source: string
-  today: string
-  tomorrow: string
-  events: {
-    today: EventItem[]
-    tomorrow: EventItem[]
-  }
-}
-
-export const HOMEPAGE_CACHE_TAG = 'homepage'
+import { HOMEPAGE_CACHE_TAG } from '~/lib/refresh'
 
 const getEventsData = createServerFn({ method: 'GET' }).handler(async () => {
   const store = getEventsStore()
