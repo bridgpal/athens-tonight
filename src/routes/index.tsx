@@ -62,21 +62,18 @@ function RouteComponent() {
       <section className="hero">
         <div className="badge">&gt;&gt; Athens, GA</div>
         <h1>TONIGHT&apos;S SHOWS</h1>
-        <p className="subhead">// Live music. Local scene. No bullshit.</p>
+        {data && <p className="subhead">Today · {data.today} // Live music. Local scene. No bullshit.</p>}
+        {!data && <p className="subhead">// Live music. Local scene. No bullshit.</p>}
       </section>
 
       <section className="panel">
         {error && <div className="status error">{error}</div>}
-{!error && !data && (
+        {!error && !data && (
           <div className="status">[ NO DATA AVAILABLE ]</div>
         )}
 
         {data && (
           <>
-            <div className="meta">
-              <span className="date-chip">Today · {data.today}</span>
-              <span className="update">Updated {updatedAt}</span>
-            </div>
             {data.events.today.length === 0 ? (
               <div className="status empty">
                 NO SHOWS LISTED YET. CHECK BACK.
@@ -121,7 +118,7 @@ function RouteComponent() {
 
       <footer className="footer">
         <span>SRC: FLAGPOLE.COM</span>
-        <span>AUTO-REFRESH: 12H</span>
+        {data && <span>Updated {updatedAt}</span>}
       </footer>
     </main>
   )
