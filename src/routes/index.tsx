@@ -60,11 +60,14 @@ function RouteComponent() {
   return (
     <main className="page">
       <section className="hero">
-        <div className="badge">&gt;&gt; Athens, GA</div>
         <h1>TONIGHT&apos;S SHOWS</h1>
-        {data && <p className="subhead">Today · {data.today} // Live music. Local scene. No bullshit.</p>}
-        {!data && <p className="subhead">// Live music. Local scene. No bullshit.</p>}
+        <p className="subhead">Live music. Local scene. No bullshit.</p>
       </section>
+
+      <div className="badge">
+        <span>&gt;&gt; Athens, GA</span>
+        {data && <span className="badge-date">{data.today}</span>}
+      </div>
 
       <section className="panel">
         {error && <div className="status error">{error}</div>}
