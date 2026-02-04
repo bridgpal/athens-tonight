@@ -185,26 +185,38 @@ export default defineConfig({
 
 The following diagram shows how data flows through the application:
 
-```mermaid
-flowchart LR
-    FP[Event source]
-    SCHED[netlify/functions/refresh-events-scheduled.ts\n(schedule)]
-    BG[/.netlify/functions/refresh-events-background\nnetlify/functions/refresh-events-background.ts]
-    REFRESH[/api/refresh\nnetlify/functions/refresh-events.ts]
-    BLOB[(Netlify Blobs\nathens-bands)]
-    API[/api/events\nnetlify/functions/events.ts]
-    INDEX[/\nsrc/routes/index.tsx]
-    USER[Browser]
+```text
+                           +----------------------+
+                           |      Event source    |
+                           +----------------------+
+                               ^            ^
+                               | fetch      | fetch
+                               |            |
+  +--------------------------------+    +--------------------------------+
+  | netlify/functions/             |    | netlify/functions/             |
+  | refresh-events-background.ts   |    | refresh-events.ts              |
+  | /.netlify/functions/           |    | /api/refresh                   |
+  | refresh-events-background      |    +--------------------------------+
+  +--------------------------------+              |
+                 | store                            | store
+                 v                                  v
+              +------------------------------------------+
+              |        Netlify Blobs (athens-bands)      |
+              +------------------------------------------+
+                 | read                          | read
+                 v                               v
+  +--------------------------------+    +------------------------------+
+  | netlify/functions/             |    | src/routes/index.tsx         |
+  | events.ts                      |    | /                            |
+  | /api/events                    |    +------------------------------+
+  +--------------------------------+              |
+                 |                                  |
+                 v                                  v
+                        +----------------------+
+                        |       Browser        |
+                        +----------------------+
 
-    SCHED --> BG
-    BG -->|fetch| FP
-    REFRESH -->|fetch| FP
-    BG -->|store| BLOB
-    REFRESH -->|store| BLOB
-    BLOB --> API
-    BLOB --> INDEX
-    API --> USER
-    INDEX --> USER
+  schedule: netlify/functions/refresh-events-scheduled.ts -> refresh-events-background
 ```
 
 ### Data Flow Explanation
