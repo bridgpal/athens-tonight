@@ -193,51 +193,25 @@ export default defineConfig({
 The following diagram shows how data flows through the application:
 
 ```mermaid
-flowchart TB
-    subgraph External["External"]
-        FP[("Flagpole.com\n(Event Source)")]
-    end
+flowchart LR
+    FP[Flagpole.com]
+    SCHED[netlify/functions/refresh-events-scheduled.ts\n(schedule)]
+    BG[/.netlify/functions/refresh-events-background\nnetlify/functions/refresh-events-background.ts]
+    REFRESH[/api/refresh\nnetlify/functions/refresh-events.ts]
+    BLOB[(Netlify Blobs\nathens-bands)]
+    API[/api/events\nnetlify/functions/events.ts]
+    INDEX[/\nsrc/routes/index.tsx]
+    USER[Browser]
 
-    subgraph Netlify["Netlify Platform"]
-        subgraph Functions["Netlify Functions"]
-            SCHED["refresh-events-scheduled.ts\n(6-hourly trigger)"]
-            BG["refresh-events-background.ts\n(15-min timeout worker)"]
-            REFRESH["refresh-events.ts\n(Manual Refresh)"]
-            API["events.ts\n(/api/events)"]
-        end
-
-        subgraph Storage["Netlify Blobs"]
-            BLOB[("athens-bands\nKey-Value Store")]
-        end
-
-        subgraph CDN["Netlify Edge/CDN"]
-            CACHE["CDN Cache\n(Cache Tags)"]
-        end
-
-        subgraph SSR["TanStack Start SSR"]
-            INDEX["index.tsx\n(Homepage)"]
-        end
-    end
-
-    subgraph Client["Browser"]
-        USER["User"]
-    end
-
-    %% Data flow
-    SCHED -->|"Trigger via HTTP"| BG
-    BG -->|"Fetch events"| FP
-    REFRESH -->|"Fetch events"| FP
-    FP -->|"Event data"| BG
-    FP -->|"Event data"| REFRESH
-    BG -->|"Store JSON"| BLOB
-    REFRESH -->|"Store JSON"| BLOB
-    BG -->|"purgeCache()"| CACHE
-    REFRESH -->|"purgeCache()"| CACHE
-    BLOB -->|"Read events"| API
-    BLOB -->|"Read events"| INDEX
-    API -->|"Cached response"| CACHE
-    INDEX -->|"Cached HTML"| CACHE
-    CACHE -->|"Serve content"| USER
+    SCHED --> BG
+    BG -->|fetch| FP
+    REFRESH -->|fetch| FP
+    BG -->|store| BLOB
+    REFRESH -->|store| BLOB
+    BLOB --> API
+    BLOB --> INDEX
+    API --> USER
+    INDEX --> USER
 ```
 
 ### Data Flow Explanation
