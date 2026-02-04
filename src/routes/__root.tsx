@@ -18,6 +18,7 @@ export const Route = createRootRoute({
       { name: 'theme-color', content: '#000000' },
       { name: 'apple-mobile-web-app-capable', content: 'yes' },
       { name: 'apple-mobile-web-app-status-bar-style', content: 'black-translucent' },
+      { name: 'apple-mobile-web-app-title', content: SITE_NAME },
       { name: 'format-detection', content: 'telephone=no' },
       { name: 'description', content: DEFAULT_DESCRIPTION },
       // Robots
@@ -48,7 +49,8 @@ export const Route = createRootRoute({
       { rel: 'stylesheet', href: appCss },
       { rel: 'icon', type: 'image/svg+xml', href: '/favicon.svg' },
       { rel: 'icon', type: 'image/x-icon', href: '/favicon.ico' },
-      { rel: 'apple-touch-icon', href: '/apple-touch-icon.svg' },
+      { rel: 'apple-touch-icon', sizes: '180x180', href: '/apple-touch-icon.png' },
+      { rel: 'manifest', href: '/manifest.json' },
       { rel: 'canonical', href: SITE_URL },
     ],
   }),
