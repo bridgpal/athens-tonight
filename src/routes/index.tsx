@@ -35,6 +35,11 @@ export const Route = createFileRoute('/')({
     const data = await getEventsData()
     return { data }
   },
+  head: () => ({
+    meta: [
+      { title: 'Athens Tonight | Live Music & Shows in Athens, GA' },
+    ],
+  }),
   headers: () => ({
     'Netlify-CDN-Cache-Control': 'public, s-maxage=43200, stale-while-revalidate=86400',
     'Netlify-Cache-Tag': HOMEPAGE_CACHE_TAG,
@@ -57,8 +62,84 @@ function RouteComponent() {
     }).format(new Date(data.fetchedAt))
   }, [data])
 
+  const jsonLd = React.useMemo(() => {
+    const graph: Record<string, unknown>[] = [
+      {
+        '@type': 'WebSite',
+        '@id': 'https://athens-bands.netlify.app/#website',
+        url: 'https://athens-bands.netlify.app',
+        name: 'Athens Tonight',
+        description: 'Discover live music happening tonight in Athens, GA. Find local bands, concerts, and shows at venues across the Classic City.',
+        publisher: {
+          '@id': 'https://athens-bands.netlify.app/#organization',
+        },
+      },
+      {
+        '@type': 'Organization',
+        '@id': 'https://athens-bands.netlify.app/#organization',
+        name: 'Athens Tonight',
+        url: 'https://athens-bands.netlify.app',
+        areaServed: {
+          '@type': 'City',
+          name: 'Athens',
+          address: {
+            '@type': 'PostalAddress',
+            addressLocality: 'Athens',
+            addressRegion: 'GA',
+            addressCountry: 'US',
+          },
+        },
+      },
+      {
+        '@type': 'WebPage',
+        '@id': 'https://athens-bands.netlify.app/#webpage',
+        url: 'https://athens-bands.netlify.app',
+        name: 'Athens Tonight | Live Music & Shows in Athens, GA',
+        isPartOf: {
+          '@id': 'https://athens-bands.netlify.app/#website',
+        },
+        about: {
+          '@id': 'https://athens-bands.netlify.app/#organization',
+        },
+        description: 'Discover live music happening tonight in Athens, GA. Find local bands, concerts, and shows at venues across the Classic City.',
+      },
+    ]
+
+    if (data && data.events.today.length > 0) {
+      const eventSchemas = data.events.today.map((event, index) => ({
+        '@type': 'MusicEvent',
+        '@id': `https://athens-bands.netlify.app/#event-${index}`,
+        name: event.title,
+        url: event.url,
+        startDate: event.date,
+        location: {
+          '@type': 'MusicVenue',
+          name: event.venue,
+          address: {
+            '@type': 'PostalAddress',
+            addressLocality: 'Athens',
+            addressRegion: 'GA',
+            addressCountry: 'US',
+          },
+        },
+        eventAttendanceMode: 'https://schema.org/OfflineEventAttendanceMode',
+        eventStatus: 'https://schema.org/EventScheduled',
+      }))
+      graph.push(...eventSchemas)
+    }
+
+    return {
+      '@context': 'https://schema.org',
+      '@graph': graph,
+    }
+  }, [data])
+
   return (
     <main className="page">
+      <script
+        type="application/ld+json"
+        dangerouslySetInnerHTML={{ __html: JSON.stringify(jsonLd) }}
+      />
       <section className="hero">
         <h1>TONIGHT&apos;S SHOWS</h1>
         <p className="subhead">Live music. Local scene. No bullshit.</p>
