@@ -1,0 +1,15 @@
+# robots.txt for Athens Tonight
+# https://athens-bands.netlify.app
+
+User-agent: *
+Allow: /
+
+# Sitemap location
+Sitemap: https://athens-bands.netlify.app/sitemap.xml
+
+# Crawl-delay for politeness
+Crawl-delay: 1
+
+# Disallow API endpoints and internal paths
+Disallow: /api/
+Disallow: /_server/
