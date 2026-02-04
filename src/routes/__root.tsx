@@ -13,7 +13,7 @@ export const Route = createRootRoute({
       { name: 'apple-mobile-web-app-capable', content: 'yes' },
       { name: 'apple-mobile-web-app-status-bar-style', content: 'black-translucent' },
       { name: 'format-detection', content: 'telephone=no' },
-      { name: 'description', content: 'Athens GA live music tonight - punk rock scene guide' },
+      { name: 'description', content: 'Athens Live Music Tonight | Find Local Bands & Shows Near You' },
     ],
     links: [
       { rel: 'stylesheet', href: appCss },
