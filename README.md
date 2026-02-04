@@ -4,6 +4,17 @@ A real-world example app demonstrating Netlify platform features with TanStack S
 
 ## Netlify Features Demonstrated
 
+### Why each Netlify primitive is used
+
+This site scrapes live music events, stores them, and serves them fast without UI flicker. Each Netlify primitive is chosen to match that workflow:
+
+- **Netlify Functions**: Provide the on-demand API (`/api/events`) and manual refresh endpoint (`/api/refresh`) so the UI and admins can fetch or refresh data without running a server.
+- **Scheduled Functions**: Automatically refresh the scraped data on a schedule, since scraping is time-consuming and should not happen on every request.
+- **Background Functions**: Run the long scraping job (up to 15 minutes) without timing out, then persist the results for fast reads.
+- **Netlify Blobs**: Store the scraped JSON in a lightweight key-value store, avoiding the overhead of running a database.
+- **CDN Cache Tags & Purging**: Cache API responses and SSR HTML at the edge for fast loads and no flicker, then purge tagged caches when new data is stored.
+- **TanStack Start SSR on Netlify**: Server-render the homepage from cached data so the first paint is complete and consistent.
+
 ### 1. Netlify Functions
 
 Serverless functions that run on-demand. See `netlify/functions/`:
