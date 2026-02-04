@@ -8,9 +8,8 @@ A real-world example app demonstrating Netlify platform features with TanStack S
 
 This site scrapes live music events, stores them, and serves them fast without UI flicker. Each Netlify primitive is chosen to match that workflow:
 
-- **Netlify Functions**: Provide the on-demand API (`/api/events`) and manual refresh endpoint (`/api/refresh`) so the UI and admins can fetch or refresh data without running a server.
+- **Netlify Functions**: Provide the manual refresh endpoint (`/api/refresh`) so admins can refresh data without running a server.
 - **Scheduled Functions**: Automatically refresh the scraped data on a schedule, since scraping is time-consuming and should not happen on every request.
-- **Background Functions**: Run the long scraping job (up to 15 minutes) without timing out, then persist the results for fast reads.
 - **Netlify Blobs**: Store the scraped JSON in a lightweight key-value store, avoiding the overhead of running a database.
 - **CDN Cache Tags**: Cache API responses and SSR HTML at the edge for fast loads and no flicker, then invalidate tags after updates.
 - **TanStack Start SSR on Netlify**: Server-render the homepage from cached data so the first paint is complete and consistent.
@@ -19,14 +18,12 @@ This site scrapes live music events, stores them, and serves them fast without U
 
 Serverless functions that run on-demand. See `netlify/functions/`:
 
-- **`events.ts`** - API endpoint at `/api/events` that reads cached data from Blobs
-- **`refresh-events.ts`** - HTTP endpoint at `/api/refresh` to manually refresh data
-- **`refresh-events-scheduled.ts`** - Scheduled function that triggers the background refresh every 6 hours
-- **`refresh-events-background.ts`** - Background function for long-running event scraping (15-minute timeout)
+- **`refresh.ts`** - HTTP endpoint at `/api/refresh` to manually refresh data
+- **`refresh-scheduled.ts`** - Scheduled function that refreshes events every 6 hours
 
 **Key concepts:**
 ```typescript
-// netlify/functions/events.ts
+// netlify/functions/refresh.ts
 import type { Config, Context } from '@netlify/functions'
 
 export default async (req: Request, context: Context) => {
@@ -36,39 +33,16 @@ export default async (req: Request, context: Context) => {
 }
 
 export const config: Config = {
-  path: '/api/events'  // Custom URL path
+  path: '/api/refresh'  // Custom URL path
 }
 ```
 
 **Scheduled functions:**
 ```typescript
-// netlify/functions/refresh-events-scheduled.ts
+// netlify/functions/refresh-scheduled.ts
 export const config: Config = {
   schedule: '0 1,7,13,19 * * *'  // Cron syntax: every 6 hours
 }
-```
-
-**Background functions:**
-
-Background functions are used for long-running tasks that exceed the 30-second scheduled function limit. They have a 15-minute timeout and return a 202 status immediately while processing continues asynchronously.
-
-```typescript
-// netlify/functions/refresh-events-background.ts
-// File name MUST end with "-background" to enable the 15-minute timeout
-export default async (_req: Request, _context: Context) => {
-  // Long-running work happens here
-  const payload = await buildEventsPayload()
-  await store.setJSON('events', payload)
-}
-```
-
-The scheduled function triggers the background function via HTTP:
-```typescript
-// In refresh-events-scheduled.ts
-await fetch(`${siteUrl}/.netlify/functions/refresh-events-background`, {
-  method: 'POST',
-})
-// Returns 202 Accepted immediately
 ```
 
 ### 2. Netlify Blobs
@@ -89,7 +63,7 @@ const data = await store.get('events', { type: 'json' })
 
 ### 3. CDN Cache Tags & Purging
 
-Control Netlify's CDN caching with tags and invalidation. See `netlify/functions/refresh-events.ts`:
+Control Netlify's CDN caching with tags and invalidation. See `netlify/functions/refresh.ts`:
 
 ```typescript
 return new Response(data, {
@@ -123,14 +97,13 @@ export const Route = createFileRoute('/')({
 ```
 ├── netlify/
 │   └── functions/           # Netlify Functions
-│       ├── events.ts        # GET /api/events
-│       ├── refresh-events.ts        # POST /api/refresh
-│       ├── refresh-events-scheduled.ts  # Scheduled trigger (every 6 hours)
-│       └── refresh-events-background.ts # Background worker (15-min timeout)
+│       ├── refresh.ts              # POST /api/refresh
+│       └── refresh-scheduled.ts    # Scheduled trigger (every 6 hours)
 ├── src/
 │   ├── lib/
 │   │   ├── events.ts        # Event fetching logic
-│   │   └── events-store.ts  # Blob storage helper
+│   │   ├── events-store.ts  # Blob storage helper
+│   │   └── refresh.ts       # Shared refresh logic
 │   ├── routes/
 │   │   ├── __root.tsx       # Root layout
 │   │   ├── index.tsx        # Homepage
@@ -189,45 +162,42 @@ The following diagram shows how data flows through the application:
                            +----------------------+
                            |      Event source    |
                            +----------------------+
-                               ^            ^
-                               | fetch      | fetch
-                               |            |
-  +--------------------------------+    +--------------------------------+
-  | netlify/functions/             |    | netlify/functions/             |
-  | refresh-events-background.ts   |    | refresh-events.ts              |
-  | /.netlify/functions/           |    | /api/refresh                   |
-  | refresh-events-background      |    +--------------------------------+
-  +--------------------------------+              |
+                                      ^
+                                      | fetch
+                                      |
+  +--------------------------------+  |  +--------------------------------+
+  | netlify/functions/             |  |  | netlify/functions/             |
+  | refresh-scheduled.ts           |--+--| refresh.ts                     |
+  | (scheduled every 6 hours)      |     | /api/refresh                   |
+  +--------------------------------+     +--------------------------------+
+                 |                                  |
                  | store                            | store
                  v                                  v
               +------------------------------------------+
               |        Netlify Blobs (athens-bands)      |
               +------------------------------------------+
-                 | read                          | read
-                 v                               v
-  +--------------------------------+    +------------------------------+
-  | netlify/functions/             |    | src/routes/index.tsx         |
-  | events.ts                      |    | /                            |
-  | /api/events                    |    +------------------------------+
-  +--------------------------------+              |
-                 |                                  |
-                 v                                  v
-                        +----------------------+
-                        |       Browser        |
-                        +----------------------+
-
-  schedule: netlify/functions/refresh-events-scheduled.ts -> refresh-events-background
+                                      | read
+                                      v
+                       +------------------------------+
+                       | src/routes/index.tsx         |
+                       | /                            |
+                       +------------------------------+
+                                      |
+                                      v
+                       +----------------------+
+                       |       Browser        |
+                       +----------------------+
 ```
 
 ### Data Flow Explanation
 
-1. **Data Ingestion**: The scheduled function (`refresh-events-scheduled.ts`) runs every 6 hours and triggers the background function (`refresh-events-background.ts`) via HTTP. The background function has a 15-minute timeout, allowing it to handle long-running scraping operations that would exceed the 30-second scheduled function limit. Manual refreshes can also be triggered via `refresh-events.ts`.
+1. **Data Ingestion**: The scheduled function (`refresh-scheduled.ts`) runs every 6 hours and refreshes the events data. Manual refreshes can also be triggered via `refresh.ts` at `/api/refresh`.
 
 2. **Storage**: Event data is stored in Netlify Blobs, a key-value store that persists data between function invocations.
 
-3. **Cache Invalidation**: After storing new data, cached tags are invalidated so the site serves fresh content.
+3. **Cache Invalidation**: After storing new data, the homepage cache tag is invalidated so the site serves fresh content.
 
-4. **Serving**: The homepage (`index.tsx`) and API endpoint (`events.ts`) read from Blobs and serve cached responses through Netlify's CDN.
+4. **Serving**: The homepage (`index.tsx`) reads from Blobs and serves cached responses through Netlify's CDN.
 
 ## Learn More
 
