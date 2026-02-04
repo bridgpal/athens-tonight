@@ -1,8 +1,19 @@
 # Athens Tonight - Learn Netlify
 
-A real-world example app demonstrating Netlify platform features with TanStack Start. This app displays live music events in Athens, GA scraped from Flagpole.com.
+A real-world example app demonstrating Netlify platform features with TanStack Start. This app displays live music events in Athens, GA scraped from a local listings source.
 
 ## Netlify Features Demonstrated
+
+### Why each Netlify primitive is used
+
+This site scrapes live music events, stores them, and serves them fast without UI flicker. Each Netlify primitive is chosen to match that workflow:
+
+- **Netlify Functions**: Provide the on-demand API (`/api/events`) and manual refresh endpoint (`/api/refresh`) so the UI and admins can fetch or refresh data without running a server.
+- **Scheduled Functions**: Automatically refresh the scraped data on a schedule, since scraping is time-consuming and should not happen on every request.
+- **Background Functions**: Run the long scraping job (up to 15 minutes) without timing out, then persist the results for fast reads.
+- **Netlify Blobs**: Store the scraped JSON in a lightweight key-value store, avoiding the overhead of running a database.
+- **CDN Cache Tags**: Cache API responses and SSR HTML at the edge for fast loads and no flicker, then invalidate tags after updates.
+- **TanStack Start SSR on Netlify**: Server-render the homepage from cached data so the first paint is complete and consistent.
 
 ### 1. Netlify Functions
 
@@ -48,7 +59,6 @@ export default async (_req: Request, _context: Context) => {
   // Long-running work happens here
   const payload = await buildEventsPayload()
   await store.setJSON('events', payload)
-  await purgeCache({ tags: ['events-data', 'homepage'] })
 }
 ```
 
@@ -82,18 +92,12 @@ const data = await store.get('events', { type: 'json' })
 Control Netlify's CDN caching with tags and invalidation. See `netlify/functions/refresh-events.ts`:
 
 ```typescript
-import { purgeCache } from '@netlify/functions'
-
-// Set cache headers with tags
 return new Response(data, {
   headers: {
     'Netlify-CDN-Cache-Control': 'public, s-maxage=43200, stale-while-revalidate=86400',
     'Netlify-Cache-Tag': 'events-data'
   }
 })
-
-// Purge cache when data updates
-await purgeCache({ tags: ['events-data', 'homepage'] })
 ```
 
 ### 4. TanStack Start Integration
@@ -181,52 +185,38 @@ export default defineConfig({
 
 The following diagram shows how data flows through the application:
 
-```mermaid
-flowchart TB
-    subgraph External["External"]
-        FP[("Flagpole.com\n(Event Source)")]
-    end
+```text
+                           +----------------------+
+                           |      Event source    |
+                           +----------------------+
+                               ^            ^
+                               | fetch      | fetch
+                               |            |
+  +--------------------------------+    +--------------------------------+
+  | netlify/functions/             |    | netlify/functions/             |
+  | refresh-events-background.ts   |    | refresh-events.ts              |
+  | /.netlify/functions/           |    | /api/refresh                   |
+  | refresh-events-background      |    +--------------------------------+
+  +--------------------------------+              |
+                 | store                            | store
+                 v                                  v
+              +------------------------------------------+
+              |        Netlify Blobs (athens-bands)      |
+              +------------------------------------------+
+                 | read                          | read
+                 v                               v
+  +--------------------------------+    +------------------------------+
+  | netlify/functions/             |    | src/routes/index.tsx         |
+  | events.ts                      |    | /                            |
+  | /api/events                    |    +------------------------------+
+  +--------------------------------+              |
+                 |                                  |
+                 v                                  v
+                        +----------------------+
+                        |       Browser        |
+                        +----------------------+
 
-    subgraph Netlify["Netlify Platform"]
-        subgraph Functions["Netlify Functions"]
-            SCHED["refresh-events-scheduled.ts\n(6-hourly trigger)"]
-            BG["refresh-events-background.ts\n(15-min timeout worker)"]
-            REFRESH["refresh-events.ts\n(Manual Refresh)"]
-            API["events.ts\n(/api/events)"]
-        end
-
-        subgraph Storage["Netlify Blobs"]
-            BLOB[("athens-bands\nKey-Value Store")]
-        end
-
-        subgraph CDN["Netlify Edge/CDN"]
-            CACHE["CDN Cache\n(Cache Tags)"]
-        end
-
-        subgraph SSR["TanStack Start SSR"]
-            INDEX["index.tsx\n(Homepage)"]
-        end
-    end
-
-    subgraph Client["Browser"]
-        USER["User"]
-    end
-
-    %% Data flow
-    SCHED -->|"Trigger via HTTP"| BG
-    BG -->|"Fetch events"| FP
-    REFRESH -->|"Fetch events"| FP
-    FP -->|"Event data"| BG
-    FP -->|"Event data"| REFRESH
-    BG -->|"Store JSON"| BLOB
-    REFRESH -->|"Store JSON"| BLOB
-    BG -->|"purgeCache()"| CACHE
-    REFRESH -->|"purgeCache()"| CACHE
-    BLOB -->|"Read events"| API
-    BLOB -->|"Read events"| INDEX
-    API -->|"Cached response"| CACHE
-    INDEX -->|"Cached HTML"| CACHE
-    CACHE -->|"Serve content"| USER
+  schedule: netlify/functions/refresh-events-scheduled.ts -> refresh-events-background
 ```
 
 ### Data Flow Explanation
@@ -235,7 +225,7 @@ flowchart TB
 
 2. **Storage**: Event data is stored in Netlify Blobs, a key-value store that persists data between function invocations.
 
-3. **Cache Invalidation**: After storing new data, the functions call `purgeCache()` with specific cache tags to invalidate stale content.
+3. **Cache Invalidation**: After storing new data, cached tags are invalidated so the site serves fresh content.
 
 4. **Serving**: The homepage (`index.tsx`) and API endpoint (`events.ts`) read from Blobs and serve cached responses through Netlify's CDN.
 
