@@ -15,5 +15,6 @@ export default async (_req: Request, _context: Context) => {
 }
 
 export const config: Config = {
-  schedule: '0 */12 * * *',
+  // Run daily at 1:00 AM UTC (matches midnight-ish EST/EDT for fresh daily data)
+  schedule: '0 1 * * *',
 }

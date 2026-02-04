@@ -330,15 +330,6 @@ a:active {
   animation: glitch 0.3s linear infinite;
 }
 
-/* X MARKS / DECORATIVE ELEMENTS */
-.panel::before {
-  content: '///';
-  display: block;
-  font-size: 0.7rem;
-  letter-spacing: 0.3em;
-  color: var(--muted);
-  margin-bottom: 1rem;
-}
 
 /* RESPONSIVE - TABLET AND UP */
 @media (min-width: 640px) {
