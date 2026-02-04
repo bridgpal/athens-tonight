@@ -10,7 +10,8 @@ Serverless functions that run on-demand. See `netlify/functions/`:
 
 - **`events.ts`** - API endpoint at `/api/events` that reads cached data from Blobs
 - **`refresh-events.ts`** - HTTP endpoint at `/api/refresh` to manually refresh data
-- **`refresh-events-scheduled.ts`** - Scheduled function that runs daily at 1 AM UTC
+- **`refresh-events-scheduled.ts`** - Scheduled function that triggers the background refresh every 6 hours
+- **`refresh-events-background.ts`** - Background function for long-running event scraping (15-minute timeout)
 
 **Key concepts:**
 ```typescript
@@ -32,8 +33,32 @@ export const config: Config = {
 ```typescript
 // netlify/functions/refresh-events-scheduled.ts
 export const config: Config = {
-  schedule: '0 1 * * *'  // Cron syntax: daily at 1 AM UTC
+  schedule: '0 1,7,13,19 * * *'  // Cron syntax: every 6 hours
 }
+```
+
+**Background functions:**
+
+Background functions are used for long-running tasks that exceed the 30-second scheduled function limit. They have a 15-minute timeout and return a 202 status immediately while processing continues asynchronously.
+
+```typescript
+// netlify/functions/refresh-events-background.ts
+// File name MUST end with "-background" to enable the 15-minute timeout
+export default async (_req: Request, _context: Context) => {
+  // Long-running work happens here
+  const payload = await buildEventsPayload()
+  await store.setJSON('events', payload)
+  await purgeCache({ tags: ['events-data', 'homepage'] })
+}
+```
+
+The scheduled function triggers the background function via HTTP:
+```typescript
+// In refresh-events-scheduled.ts
+await fetch(`${siteUrl}/.netlify/functions/refresh-events-background`, {
+  method: 'POST',
+})
+// Returns 202 Accepted immediately
 ```
 
 ### 2. Netlify Blobs
@@ -96,7 +121,8 @@ export const Route = createFileRoute('/')({
 │   └── functions/           # Netlify Functions
 │       ├── events.ts        # GET /api/events
 │       ├── refresh-events.ts        # POST /api/refresh
-│       └── refresh-events-scheduled.ts  # Daily cron job
+│       ├── refresh-events-scheduled.ts  # Scheduled trigger (every 6 hours)
+│       └── refresh-events-background.ts # Background worker (15-min timeout)
 ├── src/
 │   ├── lib/
 │   │   ├── events.ts        # Event fetching logic
@@ -163,7 +189,8 @@ flowchart TB
 
     subgraph Netlify["Netlify Platform"]
         subgraph Functions["Netlify Functions"]
-            SCHED["refresh-events-scheduled.ts\n(Daily Cron)"]
+            SCHED["refresh-events-scheduled.ts\n(6-hourly trigger)"]
+            BG["refresh-events-background.ts\n(15-min timeout worker)"]
             REFRESH["refresh-events.ts\n(Manual Refresh)"]
             API["events.ts\n(/api/events)"]
         end
@@ -186,13 +213,14 @@ flowchart TB
     end
 
     %% Data flow
-    SCHED -->|"Fetch events"| FP
+    SCHED -->|"Trigger via HTTP"| BG
+    BG -->|"Fetch events"| FP
     REFRESH -->|"Fetch events"| FP
-    FP -->|"Event data"| SCHED
+    FP -->|"Event data"| BG
     FP -->|"Event data"| REFRESH
-    SCHED -->|"Store JSON"| BLOB
+    BG -->|"Store JSON"| BLOB
     REFRESH -->|"Store JSON"| BLOB
-    SCHED -->|"purgeCache()"| CACHE
+    BG -->|"purgeCache()"| CACHE
     REFRESH -->|"purgeCache()"| CACHE
     BLOB -->|"Read events"| API
     BLOB -->|"Read events"| INDEX
@@ -203,7 +231,7 @@ flowchart TB
 
 ### Data Flow Explanation
 
-1. **Data Ingestion**: The scheduled function (`refresh-events-scheduled.ts`) runs daily at 1 AM UTC to scrape event data from Flagpole.com. Manual refreshes can also be triggered via `refresh-events.ts`.
+1. **Data Ingestion**: The scheduled function (`refresh-events-scheduled.ts`) runs every 6 hours and triggers the background function (`refresh-events-background.ts`) via HTTP. The background function has a 15-minute timeout, allowing it to handle long-running scraping operations that would exceed the 30-second scheduled function limit. Manual refreshes can also be triggered via `refresh-events.ts`.
 
 2. **Storage**: Event data is stored in Netlify Blobs, a key-value store that persists data between function invocations.
 
@@ -218,6 +246,7 @@ flowchart TB
 **Core Features:**
 - [Netlify Functions](https://docs.netlify.com/functions/overview/) - Serverless functions that scale automatically
 - [Scheduled Functions](https://docs.netlify.com/functions/scheduled-functions/) - Run functions on a cron schedule
+- [Background Functions](https://docs.netlify.com/functions/background-functions/) - Long-running functions with 15-minute timeout
 - [Netlify Blobs](https://docs.netlify.com/blobs/overview/) - Key-value data storage for your functions
 - [Caching](https://docs.netlify.com/platform/caching/) - CDN caching and cache control headers
 - [Cache Tags & Purging](https://docs.netlify.com/platform/caching/#purge-cache-by-tags) - Fine-grained cache invalidation
