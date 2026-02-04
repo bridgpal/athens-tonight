@@ -1,6 +1,6 @@
 # Athens Tonight - Learn Netlify
 
-A real-world example app demonstrating Netlify platform features with TanStack Start. This app displays live music events in Athens, GA scraped from Flagpole.com.
+A real-world example app demonstrating Netlify platform features with TanStack Start. This app displays live music events in Athens, GA scraped from a local listings source.
 
 ## Netlify Features Demonstrated
 
@@ -12,7 +12,7 @@ This site scrapes live music events, stores them, and serves them fast without U
 - **Scheduled Functions**: Automatically refresh the scraped data on a schedule, since scraping is time-consuming and should not happen on every request.
 - **Background Functions**: Run the long scraping job (up to 15 minutes) without timing out, then persist the results for fast reads.
 - **Netlify Blobs**: Store the scraped JSON in a lightweight key-value store, avoiding the overhead of running a database.
-- **CDN Cache Tags & Purging**: Cache API responses and SSR HTML at the edge for fast loads and no flicker, then purge tagged caches when new data is stored.
+- **CDN Cache Tags**: Cache API responses and SSR HTML at the edge for fast loads and no flicker, then invalidate tags after updates.
 - **TanStack Start SSR on Netlify**: Server-render the homepage from cached data so the first paint is complete and consistent.
 
 ### 1. Netlify Functions
@@ -59,7 +59,6 @@ export default async (_req: Request, _context: Context) => {
   // Long-running work happens here
   const payload = await buildEventsPayload()
   await store.setJSON('events', payload)
-  await purgeCache({ tags: ['events-data', 'homepage'] })
 }
 ```
 
@@ -93,18 +92,12 @@ const data = await store.get('events', { type: 'json' })
 Control Netlify's CDN caching with tags and invalidation. See `netlify/functions/refresh-events.ts`:
 
 ```typescript
-import { purgeCache } from '@netlify/functions'
-
-// Set cache headers with tags
 return new Response(data, {
   headers: {
     'Netlify-CDN-Cache-Control': 'public, s-maxage=43200, stale-while-revalidate=86400',
     'Netlify-Cache-Tag': 'events-data'
   }
 })
-
-// Purge cache when data updates
-await purgeCache({ tags: ['events-data', 'homepage'] })
 ```
 
 ### 4. TanStack Start Integration
@@ -194,7 +187,7 @@ The following diagram shows how data flows through the application:
 
 ```mermaid
 flowchart LR
-    FP[Flagpole.com]
+    FP[Event source]
     SCHED[netlify/functions/refresh-events-scheduled.ts\n(schedule)]
     BG[/.netlify/functions/refresh-events-background\nnetlify/functions/refresh-events-background.ts]
     REFRESH[/api/refresh\nnetlify/functions/refresh-events.ts]
@@ -220,7 +213,7 @@ flowchart LR
 
 2. **Storage**: Event data is stored in Netlify Blobs, a key-value store that persists data between function invocations.
 
-3. **Cache Invalidation**: After storing new data, the functions call `purgeCache()` with specific cache tags to invalidate stale content.
+3. **Cache Invalidation**: After storing new data, cached tags are invalidated so the site serves fresh content.
 
 4. **Serving**: The homepage (`index.tsx`) and API endpoint (`events.ts`) read from Blobs and serve cached responses through Netlify's CDN.
 
