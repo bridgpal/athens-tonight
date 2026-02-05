@@ -86,7 +86,7 @@ const getAthensDates = () => {
   }
 }
 
-const resolveEventDate = (monthName: string, day: number) => {
+const resolveEventDate = (monthName: string, day: number, timeText?: string) => {
   const monthIndex = MONTHS[monthName]
   if (monthIndex === undefined) {
     return null
@@ -99,7 +99,30 @@ const resolveEventDate = (monthName: string, day: number) => {
     year += 1
   }
 
-  return formatDateParts({ year, month: monthIndex + 1, day })
+  let month = monthIndex + 1
+  let adjustedDay = day
+
+  // Check if time is midnight (12:00 am) - these shows belong to the previous day
+  if (timeText) {
+    const normalizedTime = timeText.toLowerCase().replace(/\s+/g, ' ').trim()
+    if (normalizedTime === '12:00 am' || normalizedTime === '12:00am') {
+      // Subtract one day
+      adjustedDay -= 1
+      if (adjustedDay < 1) {
+        // Handle month rollover
+        month -= 1
+        if (month < 1) {
+          month = 12
+          year -= 1
+        }
+        // Get last day of previous month
+        const lastDayOfPrevMonth = new Date(year, month, 0).getDate()
+        adjustedDay = lastDayOfPrevMonth
+      }
+    }
+  }
+
+  return formatDateParts({ year, month, day: adjustedDay })
 }
 
 const extractMarkdownLink = (line: string) => {
@@ -146,6 +169,28 @@ export const parseEventsFromMarkdown = (markdown: string) => {
       continue
     }
 
+    // Handle time range format: "9:00 pm - Saturday, February 7 @ 12:00 am"
+    // This format shows start time, then end date/time
+    const timeRangeMatch = line.match(
+      /^(\d{1,2}:\d{2}\s*(?:am|pm))\s*-\s*[A-Za-z]+,\s+([A-Za-z]+)\s+(\d{1,2})\s+@\s+(\d{1,2}:\d{2}\s*(?:am|pm))/i,
+    )
+
+    if (timeRangeMatch) {
+      const [, startTime, monthName, dayText, endTime] = timeRangeMatch
+      const day = Number(dayText)
+      // Use the end time's date for categorization, but display the start time
+      const normalizedEndTime = endTime.toLowerCase().replace(/\s+/g, ' ').trim()
+      const date = resolveEventDate(monthName, day, normalizedEndTime)
+
+      if (date) {
+        currentDate = date
+        // Use the start time for display (e.g., "9:00 pm")
+        currentTime = startTime.toLowerCase().replace(/\s+/g, ' ').trim()
+      }
+      continue
+    }
+
+    // Standard format: "Saturday, February 7 @ 9:00 pm"
     const dateMatch = line.match(
       /^[A-Za-z]+,\s+([A-Za-z]+)\s+(\d{1,2})\s+@\s+(.+)$/,
     )
@@ -153,11 +198,14 @@ export const parseEventsFromMarkdown = (markdown: string) => {
     if (dateMatch) {
       const [, monthName, dayText, timeText] = dateMatch
       const day = Number(dayText)
-      const date = resolveEventDate(monthName, day)
+      // Extract just the time portion (e.g., "9:00 pm" from "9:00 pm Sicard Hollow")
+      const timeOnlyMatch = timeText.match(/^(\d{1,2}:\d{2}\s*(?:am|pm))/i)
+      const parsedTime = timeOnlyMatch ? timeOnlyMatch[1].toLowerCase().replace(/\s+/g, ' ').trim() : timeText.split('[')[0].trim()
+      const date = resolveEventDate(monthName, day, parsedTime)
 
       if (date) {
         currentDate = date
-        currentTime = timeText.split('[')[0].trim()
+        currentTime = parsedTime
       }
       continue
     }
@@ -271,7 +319,24 @@ const parseEventDate = (dateText: string) => {
   if (Number.isNaN(date.getTime())) {
     return null
   }
-  const parts = getDateParts(date, ATHENS_TIME_ZONE)
+
+  // Check if the event time is midnight (12:00 AM)
+  // Late-night shows at midnight should be listed under the previous day
+  const timeFormatter = new Intl.DateTimeFormat('en-US', {
+    timeZone: ATHENS_TIME_ZONE,
+    hour: 'numeric',
+    minute: '2-digit',
+    hour12: true,
+  })
+  const timeStr = timeFormatter.format(date)
+  const isMidnight = timeStr === '12:00 AM'
+
+  // If it's midnight, subtract a day to associate with the previous day's listings
+  const adjustedDate = isMidnight
+    ? new Date(date.getTime() - 24 * 60 * 60 * 1000)
+    : date
+
+  const parts = getDateParts(adjustedDate, ATHENS_TIME_ZONE)
   return formatDateParts(parts)
 }
 
